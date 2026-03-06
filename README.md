@@ -1,1 +1,2 @@
-# KISWARMAGENTS1.0
+# KISWARMAGENTS v1.0 — Planetary Swarm Hub
+... (content from before) ...
