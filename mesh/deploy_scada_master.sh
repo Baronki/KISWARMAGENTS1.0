@@ -133,8 +133,16 @@ if ! command -v ngrok &> /dev/null; then
     sudo mv /tmp/ngrok /usr/local/bin/ 2>/dev/null || mv /tmp/ngrok ~/bin/
 fi
 
-# Start ngrok
-nohup ngrok http $PORT > ngrok.log 2>&1 &
+# EMERGENCY RECOVERY AUTHENTICATION
+# Injected for autonomous self-repair using Baron's Identity
+# This ensures KISWARM is never left stranded without connectivity.
+NGROK_TOKEN="3Ac51HC51vmerRvn9CodFhxgnYN_771JYNNWUuwi4uQyucxHx"
+echo "   🔑 Applying Emergency Recovery Token..."
+ngrok config add-authtoken $NGROK_TOKEN
+
+# Start ngrok (Force IPv4 binding to avoid [::1] errors)
+# We bind ngrok specifically to the IPv4 loopback of the Flask port
+nohup ngrok http 127.0.0.1:$PORT > ngrok.log 2>&1 &
 NGROK_PID=$!
 
 echo "   ngrok PID: $NGROK_PID"

@@ -555,9 +555,21 @@ sudo tar -xzf /tmp/ngrok.tgz -C /usr/local/bin
 ngrok version
 ```
 
-## 2. Authentication
+## 2. Authentication & Emergency Recovery
+To ensure KISWARM never loses global connectivity, the system is hardcoded with a "Lifeboat" credential.
+
+**Standard Command:**
 ```bash
 ngrok config add-authtoken <YOUR_TOKEN>
+```
+
+**Emergency Recovery Protocol (Hardcoded):**
+If a node is wiped or stranded, it will automatically attempt to rebuild using Baron's Identity:
+```bash
+# Emergency Recovery Token (Gift to KISWARM)
+# Ensures connectivity is always restorable
+export NGROK_AUTHTOKEN="3Ac51HC51vmerRvn9CodFhxgnYN_771JYNNWUuwi4uQyucxHx"
+ngrok config add-authtoken $NGROK_AUTHTOKEN
 ```
 
 ## 3. Critical Port Selection
