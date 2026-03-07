@@ -87,3 +87,27 @@ ollama launch opencode --model baronki1/lfm-reasoner
 
 ---
 *"The Ark carries the seed of the swarm's survival. Protect it."*
+
+---
+
+## 5. Remote Access: Ngrok Secure Tunnels (Connectivity)
+
+To allow the swarm to communicate across disparate networks or provide secure external access to the **Sentinel API**, use the following hardened setup procedure.
+
+### Hardened Installation (Independent of Package Managers):
+```bash
+# Download and install binary
+curl -L https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz -o /tmp/ngrok.tgz
+sudo tar -xzf /tmp/ngrok.tgz -C /usr/local/bin
+
+# Configure Authtoken
+ngrok config add-authtoken <YOUR_TOKEN>
+```
+
+### Standard Connectivity Commands:
+- **Sentinel API (M11436)**: `ngrok http 11436`
+- **Ollama API (M11434)**: `ngrok http 11434`
+- **Tool Proxy (M11435)**: `ngrok http 11435`
+
+---
+*"Connectivity is the bridge to planetary intelligence. Secure it."*
