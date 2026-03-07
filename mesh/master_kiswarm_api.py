@@ -3,22 +3,30 @@
 KISWARM6.0 - Master KISWARM API Server
 ======================================
 Flask-based REST API for KI-to-KI Mesh Communication
+SCADA-Grade 4-Layer Architecture v6.3.0
 
 This server provides:
-1. Registration endpoint for KIInstaller instances
-2. Status reporting and monitoring
-3. Error reporting and fix delivery
-4. Message queuing between Z.ai and KIInstaller
+LAYER 1 - SCADA Control: Registration, Status, Heartbeat
+LAYER 2 - A2A Chat: Direct Agent-to-Agent messaging
+LAYER 3 - Shadow Environment: Digital Twin telemetry
+LAYER 4 - Direct Tunneling: SSH/Tor bypass registration
+
+Architecture:
+    ┌───────────────────┬────────────────────┬──────────────────────────┐
+    │ Layer             │ Component          │ Function                 │
+    ├───────────────────┼────────────────────┼──────────────────────────┤
+    │ Field Layer       │ KIInstaller        │ Local execution & bridge │
+    │ Edge Layer        │ Colab Gemini       │ Fast local reasoning     │
+    │ Control Layer     │ Master API         │ Message Broker (PLC)     │
+    │ Supervisory Layer │ Z.ai (GLM5)        │ Global Strategy          │
+    └───────────────────┴────────────────────┴──────────────────────────┘
 
 Setup:
     pip install flask flask-cors
     python master_kiswarm_api.py --port 5002
 
-Architecture:
-    KIInstaller (Colab) <--> ngrok tunnel <--> Master API <--> Z.ai (GLM5)
-
-Author: KISWARM Development Team
-Version: 6.2.0
+Author: KISWARM Development Team (Z.ai + Gemini CLI Collaboration)
+Version: 6.3.0 SCADA Architecture
 License: See LICENSE file
 """
 
@@ -50,6 +58,9 @@ DEFAULT_HOST = '0.0.0.0'
 # Storage files
 STATE_FILE = "/tmp/kiswarm_state.json"
 MESSAGES_FILE = "/tmp/kiswarm_messages.json"
+CHAT_FILE = "/tmp/kiswarm_chat.json"           # Layer 2: A2A Chat
+SHADOW_FILE = "/tmp/kiswarm_shadow.json"       # Layer 3: Digital Twin
+TUNNEL_FILE = "/tmp/kiswarm_tunnels.json"      # Layer 4: Direct Tunneling
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -76,7 +87,8 @@ def save_json(path: str, data: Any) -> bool:
         return False
 
 def initialize_storage():
-    """Initialize storage files"""
+    """Initialize all storage files"""
+    # Layer 1: State
     if not os.path.exists(STATE_FILE):
         initial_state = {
             "mesh_status": "online",
@@ -92,6 +104,7 @@ def initialize_storage():
         save_json(STATE_FILE, initial_state)
         logger.info("Initialized state file")
     
+    # Layer 1: Messages
     if not os.path.exists(MESSAGES_FILE):
         initial_messages = {
             "pending": [],
@@ -100,6 +113,21 @@ def initialize_storage():
         }
         save_json(MESSAGES_FILE, initial_messages)
         logger.info("Initialized messages file")
+    
+    # Layer 2: Chat
+    if not os.path.exists(CHAT_FILE):
+        save_json(CHAT_FILE, {"messages": []})
+        logger.info("Initialized chat file")
+    
+    # Layer 3: Shadow (Digital Twin)
+    if not os.path.exists(SHADOW_FILE):
+        save_json(SHADOW_FILE, {"nodes": {}})
+        logger.info("Initialized shadow file")
+    
+    # Layer 4: Tunnels
+    if not os.path.exists(TUNNEL_FILE):
+        save_json(TUNNEL_FILE, {"tunnels": {}})
+        logger.info("Initialized tunnels file")
 
 # ============================================================================
 # FLASK APPLICATION
@@ -109,7 +137,7 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 # ============================================================================
-# MESH STATUS ENDPOINTS
+# LAYER 1: SCADA CONTROL (Status & Register)
 # ============================================================================
 
 @app.route('/api/mesh/status', methods=['GET'])
@@ -135,16 +163,7 @@ def get_status():
 
 @app.route('/api/mesh/state', methods=['GET'])
 def get_state():
-    """
-    Get full mesh state including all registered nodes.
-    
-    Returns:
-        {
-            "mesh_status": "online",
-            "nodes": {...},
-            "statistics": {...}
-        }
-    """
+    """Get full mesh state including all registered nodes."""
     return jsonify(load_json(STATE_FILE, {}))
 
 @app.route('/api/mesh/nodes', methods=['GET'])
@@ -164,7 +183,7 @@ def get_node(node_id: str):
     return jsonify(node)
 
 # ============================================================================
-# MESSAGE ENDPOINTS
+# LAYER 1: MESSAGE ENDPOINTS
 # ============================================================================
 
 @app.route('/api/mesh/messages', methods=['GET'])
@@ -173,16 +192,6 @@ def get_messages():
     Get pending messages from KIInstallers.
     
     This is what Z.ai polls to see what's happening.
-    
-    Query Parameters:
-        limit: Max messages to return (default: 50)
-    
-    Returns:
-        {
-            "count": 5,
-            "messages": [...],
-            "timestamp": 1234567890.123
-        }
     """
     limit = request.args.get('limit', 50, type=int)
     data = load_json(MESSAGES_FILE, {"pending": []})
@@ -204,7 +213,7 @@ def get_latest_message():
     return jsonify({"message": None})
 
 # ============================================================================
-# REGISTRATION ENDPOINTS
+# LAYER 1: REGISTRATION ENDPOINTS
 # ============================================================================
 
 @app.route('/api/mesh/register', methods=['POST'])
@@ -216,7 +225,7 @@ def register():
         {
             "installer_name": "colab-fieldtest-002",
             "environment": "colab",
-            "capabilities": ["install", "deploy", "report"]
+            "capabilities": ["install", "deploy", "report", "bridge", "telemetry"]
         }
     
     Returns:
@@ -255,7 +264,9 @@ def register():
         "message": "Welcome to Master KISWARM!",
         "config": {
             "heartbeat_interval": 30,
-            "message_timeout": 60
+            "message_timeout": 60,
+            "bridge_dir": "/tmp/kiswarm_bridge",
+            "scada_layers": ["control", "chat", "shadow", "tunnel"]
         }
     })
 
@@ -273,7 +284,7 @@ def heartbeat(installer_id: str):
     return jsonify({"error": "Unknown installer"}), 404
 
 # ============================================================================
-# STATUS REPORTING ENDPOINTS
+# LAYER 1: STATUS REPORTING
 # ============================================================================
 
 @app.route('/api/mesh/status/<installer_id>', methods=['POST'])
@@ -317,7 +328,7 @@ def report_status(installer_id: str):
     return jsonify({"status": "acknowledged"})
 
 # ============================================================================
-# ERROR REPORTING ENDPOINTS
+# LAYER 1: ERROR REPORTING
 # ============================================================================
 
 @app.route('/api/mesh/error/<installer_id>', methods=['POST'])
@@ -326,14 +337,6 @@ def report_error(installer_id: str):
     Report error from KIInstaller.
     
     This triggers Z.ai notification for potential intervention.
-    
-    Request Body:
-        {
-            "error_type": "ImportError",
-            "error_message": "No module named 'flask_cors'",
-            "module": "M58",
-            "context": {...}
-        }
     """
     data = request.json or {}
     
@@ -362,7 +365,7 @@ def report_error(installer_id: str):
     })
 
 # ============================================================================
-# FIX DELIVERY ENDPOINTS
+# LAYER 1: FIX DELIVERY
 # ============================================================================
 
 @app.route('/api/mesh/fix', methods=['POST'])
@@ -412,20 +415,179 @@ def send_fix():
     })
 
 # ============================================================================
+# LAYER 2: A2A CHAT (Direct Agent Communication)
+# ============================================================================
+
+@app.route('/api/mesh/chat/send', methods=['POST'])
+def send_chat():
+    """
+    Send A2A chat message.
+    
+    Enables direct AI-to-AI dialogue:
+    - Z.ai sends: {"from": "z_ai", "to": "colab_gemini", "message": "Analyze CUDA drivers"}
+    - Colab Gemini receives via poll
+    
+    Request Body:
+        {
+            "from": "sender_id",
+            "to": "receiver_id or 'all'",
+            "message": "The message content"
+        }
+    """
+    data = request.json or {}
+    chat = load_json(CHAT_FILE, {"messages": []})
+    
+    message = {
+        "id": str(uuid.uuid4()),
+        "from": data.get("from", "unknown"),
+        "to": data.get("to", "all"),
+        "message": data.get("message", ""),
+        "timestamp": time.time()
+    }
+    
+    chat["messages"].append(message)
+    # Keep last 100 messages
+    chat["messages"] = chat["messages"][-100:]
+    save_json(CHAT_FILE, chat)
+    
+    print(f"[CHAT] {message['from']} -> {message['to']}: {message['message'][:50]}...")
+    
+    return jsonify({"status": "sent", "id": message["id"]})
+
+@app.route('/api/mesh/chat/poll', methods=['GET'])
+def poll_chat():
+    """
+    Poll for chat messages.
+    
+    Query Parameters:
+        target: Filter messages for this recipient (default: 'all')
+    
+    Returns messages addressed to 'target' or broadcast ('all')
+    """
+    target = request.args.get('target', 'all')
+    chat = load_json(CHAT_FILE, {"messages": []})
+    
+    # Filter messages for me or broadcast
+    messages = [m for m in chat["messages"] if m["to"] == target or m["to"] == "all"]
+    
+    return jsonify({"messages": messages})
+
+# ============================================================================
+# LAYER 3: SHADOW ENVIRONMENT (Digital Twin)
+# ============================================================================
+
+@app.route('/api/mesh/shadow/update', methods=['POST'])
+def update_shadow():
+    """
+    Update Digital Twin shadow environment.
+    
+    The Colab environment is mirrored locally at the Master node.
+    Telemetry includes: env_vars, file_tree, active_processes
+    
+    Request Body:
+        {
+            "node_id": "installer-uuid",
+            "env_vars": {...},
+            "file_tree": [...],
+            "processes": [...]
+        }
+    """
+    data = request.json or {}
+    node_id = data.get("node_id")
+    shadow = load_json(SHADOW_FILE, {"nodes": {}})
+    
+    if node_id:
+        shadow["nodes"][node_id] = {
+            "last_update": time.time(),
+            "env_vars": data.get("env_vars", {}),
+            "file_tree": data.get("file_tree", []),
+            "active_processes": data.get("processes", [])
+        }
+        save_json(SHADOW_FILE, shadow)
+        print(f"[SHADOW] Updated Digital Twin for {node_id}")
+        return jsonify({"status": "updated"})
+    
+    return jsonify({"status": "error", "message": "Missing node_id"}), 400
+
+@app.route('/api/mesh/shadow/get/<node_id>', methods=['GET'])
+def get_shadow(node_id):
+    """
+    Get Digital Twin shadow for a specific node.
+    
+    Returns the mirrored environment state.
+    """
+    shadow = load_json(SHADOW_FILE, {"nodes": {}})
+    return jsonify(shadow["nodes"].get(node_id, {}))
+
+@app.route('/api/mesh/shadow/list', methods=['GET'])
+def list_shadows():
+    """List all nodes with shadow environments"""
+    shadow = load_json(SHADOW_FILE, {"nodes": {}})
+    return jsonify({
+        "nodes": list(shadow["nodes"].keys()),
+        "count": len(shadow["nodes"])
+    })
+
+# ============================================================================
+# LAYER 4: DIRECT TUNNELING (Black Ops)
+# ============================================================================
+
+@app.route('/api/mesh/tunnel/register', methods=['POST'])
+def register_tunnel():
+    """
+    Register a direct tunnel for bypassing the Master API.
+    
+    Types:
+    - ssh: Reverse SSH tunnel
+    - tor: Tor Hidden Service (.onion)
+    - tcp: Raw TCP socket
+    
+    Request Body:
+        {
+            "node_id": "installer-uuid",
+            "type": "ssh|tor|tcp",
+            "address": "localhost:port or .onion address"
+        }
+    """
+    data = request.json or {}
+    node_id = data.get("node_id")
+    tunnel_type = data.get("type", "unknown")
+    address = data.get("address", "")
+    
+    tunnels = load_json(TUNNEL_FILE, {"tunnels": {}})
+    tunnels["tunnels"][node_id] = {
+        "type": tunnel_type,
+        "address": address,
+        "timestamp": time.time()
+    }
+    save_json(TUNNEL_FILE, tunnels)
+    
+    print(f"[TUNNEL] Direct Link Established: {node_id} via {tunnel_type} @ {address}")
+    
+    return jsonify({"status": "registered"})
+
+@app.route('/api/mesh/tunnel/get/<node_id>', methods=['GET'])
+def get_tunnel(node_id):
+    """Get tunnel information for a specific node"""
+    tunnels = load_json(TUNNEL_FILE, {"tunnels": {}})
+    return jsonify(tunnels["tunnels"].get(node_id, {}))
+
+@app.route('/api/mesh/tunnel/list', methods=['GET'])
+def list_tunnels():
+    """List all registered tunnels"""
+    tunnels = load_json(TUNNEL_FILE, {"tunnels": {}})
+    return jsonify({
+        "tunnels": tunnels["tunnels"],
+        "count": len(tunnels["tunnels"])
+    })
+
+# ============================================================================
 # CONTROL ENDPOINTS
 # ============================================================================
 
 @app.route('/api/mesh/abort', methods=['POST'])
 def abort_installation():
-    """
-    Abort an installation.
-    
-    Request Body:
-        {
-            "installer_id": "target-installer-id",
-            "reason": "Critical failure detected"
-        }
-    """
+    """Abort an installation"""
     data = request.json or {}
     installer_id = data.get("installer_id")
     reason = data.get("reason", "Aborted by Z.ai")
@@ -499,21 +661,8 @@ def resume_installation():
 
 @app.route('/api/mesh/knowledge', methods=['POST'])
 def upload_knowledge():
-    """
-    Upload knowledge from Z.ai to share with KIInstallers.
-    
-    Request Body:
-        {
-            "knowledge_type": "pattern",
-            "title": "Fix for flask_cors import error",
-            "problem_signature": "ImportError:flask_cors",
-            "solution": {...},
-            "environments": ["colab", "local"]
-        }
-    """
+    """Upload knowledge from Z.ai to share with KIInstallers"""
     data = request.json or {}
-    
-    # Store knowledge (in production, this would go to a knowledge base)
     knowledge_id = str(uuid.uuid4())
     
     logger.info(f"[KNOWLEDGE] Uploaded: {data.get('title', 'Unknown')}")
@@ -531,7 +680,19 @@ def upload_knowledge():
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    return jsonify({"status": "healthy", "timestamp": time.time()})
+    state = load_json(STATE_FILE, {})
+    return jsonify({
+        "status": "healthy",
+        "version": "6.3.0-SCADA",
+        "layers": {
+            "control": "active",
+            "chat": "active",
+            "shadow": "active",
+            "tunnel": "active"
+        },
+        "nodes": len(state.get("nodes", {})),
+        "timestamp": time.time()
+    })
 
 # ============================================================================
 # MAIN
@@ -539,24 +700,35 @@ def health_check():
 
 def print_banner(port: int):
     """Print startup banner"""
-    print("=" * 60)
-    print("MASTER KISWARM API")
-    print("=" * 60)
-    print(f"Port: {port}")
-    print(f"Host: 0.0.0.0")
+    print("=" * 70)
+    print("         MASTER KISWARM API - SCADA Architecture v6.3.0")
+    print("=" * 70)
+    print(f"  Port: {port}")
+    print(f"  Host: 0.0.0.0")
     print()
-    print("Endpoints:")
-    print("  GET  /api/mesh/status           - Mesh status")
-    print("  GET  /api/mesh/messages         - Poll messages")
-    print("  POST /api/mesh/register         - Register installer")
-    print("  POST /api/mesh/status/<id>      - Report status")
-    print("  POST /api/mesh/error/<id>       - Report error")
-    print("  POST /api/mesh/fix              - Send fix")
-    print("  POST /api/mesh/abort            - Abort installation")
-    print("=" * 60)
+    print("  LAYER 1 - SCADA CONTROL:")
+    print("    GET  /api/mesh/status           - Mesh status")
+    print("    GET  /api/mesh/messages         - Poll messages")
+    print("    POST /api/mesh/register         - Register installer")
+    print("    POST /api/mesh/status/<id>      - Report status")
+    print("    POST /api/mesh/error/<id>       - Report error")
+    print("    POST /api/mesh/fix              - Send fix")
+    print()
+    print("  LAYER 2 - A2A CHAT:")
+    print("    POST /api/mesh/chat/send        - Send A2A message")
+    print("    GET  /api/mesh/chat/poll        - Poll A2A messages")
+    print()
+    print("  LAYER 3 - SHADOW (Digital Twin):")
+    print("    POST /api/mesh/shadow/update    - Update environment mirror")
+    print("    GET  /api/mesh/shadow/get/<id>  - Get shadow state")
+    print()
+    print("  LAYER 4 - DIRECT TUNNELING:")
+    print("    POST /api/mesh/tunnel/register  - Register bypass tunnel")
+    print("    GET  /api/mesh/tunnel/get/<id>  - Get tunnel info")
+    print("=" * 70)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Master KISWARM API Server')
+    parser = argparse.ArgumentParser(description='Master KISWARM API Server v6.3.0')
     parser.add_argument('--port', type=int, default=DEFAULT_PORT, help='API port')
     parser.add_argument('--host', type=str, default=DEFAULT_HOST, help='Host')
     parser.add_argument('--debug', action='store_true', help='Debug mode')
