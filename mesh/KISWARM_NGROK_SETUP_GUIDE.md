@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # KISWARM6.0 - ngrok Setup Guide for Master KISWARM
 ## Complete Field-Tested Installation Documentation
 
@@ -538,3 +539,43 @@ ngrok http 5002 &
 - ngrok Documentation: https://ngrok.com/docs
 - KISWARM Repository: https://github.com/Baronki/KISWARMAGENTS1.0
 - KI-to-KI Mesh Protocol: See `m58_ki_ki_mesh_protocol.md`
+=======
+# KISWARM Ngrok Battle-Tested Setup Guide
+
+## 1. Installation Method
+**Issue:** Standard `apt install ngrok` may fail due to GPG key issues or repository signing errors.
+**Solution:** Use the standalone binary approach.
+
+```bash
+# Download binary
+curl -L https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz -o /tmp/ngrok.tgz
+# Extract
+sudo tar -xzf /tmp/ngrok.tgz -C /usr/local/bin
+# Verify
+ngrok version
+```
+
+## 2. Authentication
+```bash
+ngrok config add-authtoken <YOUR_TOKEN>
+```
+
+## 3. Critical Port Selection
+**Port 5001 Conflict:** On systems with IPFS installed, Port 5001 is reserved for the IPFS API.
+**Port 5002 Solution:** Use Port 5002 for the Master KISWARM API to avoid "Address already in use" or "404 page not found" (IPFS default) errors.
+
+```bash
+# Start tunnel
+ngrok http 5002
+```
+
+## 4. The "Browser Warning" Discovery (CRITICAL)
+Ngrok Free Tier includes an interstitial warning page that returns HTML instead of JSON for programmatic requests.
+**Programmatic Bypass:** Every KI-to-KI request (Z.ai to Master, or KIInstaller to Master) MUST include this header:
+
+```http
+ngrok-skip-browser-warning: true
+```
+
+Without this header, Python `requests.post()` will fail to parse JSON and receive a 200 OK with the HTML warning page instead.
+>>>>>>> 4ca2690 (docs: Add KI-to-KI Mesh Communication Protocol v6.2.0)

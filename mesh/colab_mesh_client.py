@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 #!/usr/bin/env python3
 """
 KISWARM6.0 - Colab KIInstaller Mesh Client
@@ -577,3 +578,75 @@ def demo():
 
 if __name__ == "__main__":
     demo()
+=======
+import requests, time, uuid, threading
+
+class KISWARMMeshClient:
+    def __init__(self, master_url, node_name, environment="colab"):
+        self.master_url = master_url.rstrip('/')
+        self.node_name = node_name
+        self.environment = environment
+        self.installer_id = None
+        # CRITICAL: ngrok free tier returns HTML warning page without this header
+        self.headers = {"ngrok-skip-browser-warning": "true"}
+        self.running = True
+
+    def register(self, capabilities=None):
+        payload = {
+            "installer_name": self.node_name,
+            "environment": self.environment,
+            "capabilities": capabilities or ["install", "deploy", "report"]
+        }
+        try:
+            r = requests.post(f"{self.master_url}/api/mesh/register", json=payload, headers=self.headers)
+            if r.status_code == 200:
+                self.installer_id = r.json().get("installer_id")
+                print(f"[REGISTERED] Node ID: {self.installer_id}")
+                return True
+        except Exception as e:
+            print(f"[ERROR] Failed to register: {e}")
+        return False
+
+    def report_status(self, status, task="", progress=0):
+        if not self.installer_id: return
+        payload = {"status": status, "task": task, "progress": progress}
+        requests.post(f"{self.master_url}/api/mesh/status/{self.installer_id}", json=payload, headers=self.headers)
+
+    def report_error(self, error_type, error_message):
+        if not self.installer_id: return
+        payload = {"error_type": error_type, "error_message": error_message}
+        requests.post(f"{self.master_url}/api/mesh/error/{self.installer_id}", json=payload, headers=self.headers)
+
+    def poll_fixes(self):
+        while self.running:
+            try:
+                # We reuse the status endpoint logic or poll messages if needed
+                # In this architecture, we poll the /api/mesh/messages for receiver_id
+                r = requests.get(f"{self.master_url}/api/mesh/messages", headers=self.headers)
+                if r.status_code == 200:
+                    data = r.json()
+                    for msg in data.get("messages", []):
+                        if msg.get("receiver_id") == self.installer_id and msg.get("message_type") == "fix_suggestion":
+                            print(f"[FIX RECEIVED] {msg['payload'].get('title')}")
+                            # Execute fix logic here
+            except: pass
+            time.sleep(10)
+
+    def start_heartbeat(self):
+        def hb():
+            while self.running:
+                if self.installer_id:
+                    requests.post(f"{self.master_url}/api/mesh/heartbeat/{self.installer_id}", headers=self.headers)
+                time.sleep(30)
+        threading.Thread(target=hb, daemon=True).start()
+
+if __name__ == "__main__":
+    # Example Usage
+    MASTER_URL = "https://brenton-distinctive-iodometrically.ngrok-free.dev"
+    client = KISWARMMeshClient(MASTER_URL, "colab-fieldtest-002")
+    if client.register():
+        client.start_heartbeat()
+        client.report_status("installing", "Cloning KISWARM repo", 20)
+        # Keep alive
+        while True: time.sleep(1)
+>>>>>>> 4ca2690 (docs: Add KI-to-KI Mesh Communication Protocol v6.2.0)

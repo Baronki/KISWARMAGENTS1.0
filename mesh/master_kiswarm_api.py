@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+<<<<<<< HEAD
 """
 KISWARM6.0 - Master KISWARM API Server
 ======================================
@@ -57,10 +58,25 @@ MESSAGES_FILE = "/tmp/kiswarm_messages.json"
 
 def load_json(path: str, default: Any = None) -> Any:
     """Load JSON file safely"""
+=======
+"""KISWARM6.0 - Master KISWARM API Server"""
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+import json, time, uuid, os
+
+app = Flask(__name__)
+CORS(app)
+
+STATE_FILE = "/tmp/kiswarm_state.json"
+MESSAGES_FILE = "/tmp/kiswarm_messages.json"
+
+def load_json(path, default):
+>>>>>>> 4ca2690 (docs: Add KI-to-KI Mesh Communication Protocol v6.2.0)
     try:
         if os.path.exists(path):
             with open(path, 'r') as f:
                 return json.load(f)
+<<<<<<< HEAD
     except Exception as e:
         logger.warning(f"Error loading {path}: {e}")
     return default if default is not None else {}
@@ -292,6 +308,59 @@ def report_status(installer_id: str):
     data = request.json or {}
     
     # Add to messages
+=======
+    except: pass
+    return default
+
+def save_json(path, data):
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=2)
+
+# Initialize
+if not os.path.exists(STATE_FILE):
+    save_json(STATE_FILE, {"mesh_status": "online", "nodes": {}, "statistics": {"messages_total": 0}})
+if not os.path.exists(MESSAGES_FILE):
+    save_json(MESSAGES_FILE, {"pending": [], "processed": []})
+
+@app.route('/api/mesh/status', methods=['GET'])
+def get_status():
+    state = load_json(STATE_FILE, {})
+    return jsonify({"status": "online", "mesh_status": state.get("mesh_status", "unknown"),
+                    "nodes_count": len(state.get("nodes", {})), "timestamp": time.time()})
+
+@app.route('/api/mesh/state', methods=['GET'])
+def get_state():
+    return jsonify(load_json(STATE_FILE, {}))
+
+@app.route('/api/mesh/messages', methods=['GET'])
+def get_messages():
+    data = load_json(MESSAGES_FILE, {"pending": []})
+    messages = data["pending"][:50]
+    return jsonify({"count": len(messages), "messages": messages, "timestamp": time.time()})
+
+@app.route('/api/mesh/register', methods=['POST'])
+def register():
+    data = request.json or {}
+    installer_id = str(uuid.uuid4())
+    state = load_json(STATE_FILE, {"nodes": {}})
+    state["nodes"][installer_id] = {
+        "node_id": installer_id,
+        "node_name": data.get("installer_name", "unknown"),
+        "environment": data.get("environment", "unknown"),
+        "capabilities": data.get("capabilities", []),
+        "status": "online",
+        "last_seen": time.time()
+    }
+    state["statistics"] = {"messages_total": state.get("statistics", {}).get("messages_total", 0) + 1}
+    save_json(STATE_FILE, state)
+    print(f"[REGISTER] {data.get('installer_name')} -> {installer_id}")
+    return jsonify({"installer_id": installer_id, "status": "registered",
+                    "message": "Welcome to Master KISWARM!"})
+
+@app.route('/api/mesh/status/<installer_id>', methods=['POST'])
+def report_status(installer_id):
+    data = request.json or {}
+>>>>>>> 4ca2690 (docs: Add KI-to-KI Mesh Communication Protocol v6.2.0)
     msgs = load_json(MESSAGES_FILE, {"pending": []})
     msgs["pending"].append({
         "message_id": str(uuid.uuid4()),
@@ -301,6 +370,7 @@ def report_status(installer_id: str):
         "payload": data
     })
     save_json(MESSAGES_FILE, msgs)
+<<<<<<< HEAD
     
     # Update node state
     state = load_json(STATE_FILE, {"nodes": {}})
@@ -338,16 +408,34 @@ def report_error(installer_id: str):
     data = request.json or {}
     
     # Add as high-priority message
+=======
+    state = load_json(STATE_FILE, {"nodes": {}})
+    if installer_id in state.get("nodes", {}):
+        state["nodes"][installer_id]["status"] = data.get("status")
+        state["nodes"][installer_id]["last_seen"] = time.time()
+        save_json(STATE_FILE, state)
+    print(f"[STATUS] {installer_id[:8]}...: {data.get('status')} - {data.get('task', '')} ({data.get('progress', 0)}%)")
+    return jsonify({"status": "acknowledged"})
+
+@app.route('/api/mesh/error/<installer_id>', methods=['POST'])
+def report_error(installer_id):
+    data = request.json or {}
+>>>>>>> 4ca2690 (docs: Add KI-to-KI Mesh Communication Protocol v6.2.0)
     msgs = load_json(MESSAGES_FILE, {"pending": []})
     msgs["pending"].append({
         "message_id": str(uuid.uuid4()),
         "message_type": "error_report",
         "sender_id": installer_id,
+<<<<<<< HEAD
         "priority": 0,  # Highest priority
+=======
+        "priority": 0,
+>>>>>>> 4ca2690 (docs: Add KI-to-KI Mesh Communication Protocol v6.2.0)
         "timestamp": time.time(),
         "payload": data
     })
     save_json(MESSAGES_FILE, msgs)
+<<<<<<< HEAD
     
     # Update statistics
     state = load_json(STATE_FILE, {})
@@ -387,6 +475,15 @@ def send_fix():
     installer_id = data.get("installer_id")
     
     # Add as fix message
+=======
+    print(f"[ERROR] {installer_id[:8]}...: {data.get('error_type')} - {data.get('error_message')}")
+    return jsonify({"status": "acknowledged", "message": "Error logged, awaiting fix from Z.ai"})
+
+@app.route('/api/mesh/fix', methods=['POST'])
+def send_fix():
+    data = request.json or {}
+    installer_id = data.get("installer_id")
+>>>>>>> 4ca2690 (docs: Add KI-to-KI Mesh Communication Protocol v6.2.0)
     msgs = load_json(MESSAGES_FILE, {"pending": []})
     msgs["pending"].append({
         "message_id": str(uuid.uuid4()),
@@ -397,6 +494,7 @@ def send_fix():
         "payload": data
     })
     save_json(MESSAGES_FILE, msgs)
+<<<<<<< HEAD
     
     # Update statistics
     state = load_json(STATE_FILE, {})
@@ -430,6 +528,15 @@ def abort_installation():
     installer_id = data.get("installer_id")
     reason = data.get("reason", "Aborted by Z.ai")
     
+=======
+    print(f"[FIX] Sent to {installer_id[:8] if installer_id else 'unknown'}...: {data.get('title', '')}")
+    return jsonify({"status": "queued", "fix": data, "timestamp": time.time()})
+
+@app.route('/api/mesh/abort', methods=['POST'])
+def abort():
+    data = request.json or {}
+    installer_id = data.get("installer_id")
+>>>>>>> 4ca2690 (docs: Add KI-to-KI Mesh Communication Protocol v6.2.0)
     msgs = load_json(MESSAGES_FILE, {"pending": []})
     msgs["pending"].append({
         "message_id": str(uuid.uuid4()),
@@ -437,6 +544,7 @@ def abort_installation():
         "sender_id": "z_ai",
         "receiver_id": installer_id,
         "timestamp": time.time(),
+<<<<<<< HEAD
         "payload": {"reason": reason}
     })
     save_json(MESSAGES_FILE, msgs)
@@ -576,3 +684,24 @@ if __name__ == '__main__':
         debug=args.debug,
         threaded=True
     )
+=======
+        "payload": {"reason": data.get("reason", "Aborted")}
+    })
+    save_json(MESSAGES_FILE, msgs)
+    print(f"[ABORT] Sent to {installer_id[:8] if installer_id else 'unknown'}...")
+    return jsonify({"status": "queued"})
+
+@app.route('/api/mesh/heartbeat/<installer_id>', methods=['POST'])
+def heartbeat(installer_id):
+    state = load_json(STATE_FILE, {"nodes": {}})
+    if installer_id in state.get("nodes", {}):
+        state["nodes"][installer_id]["last_seen"] = time.time()
+        save_json(STATE_FILE, state)
+    return jsonify({"status": "acknowledged"})
+
+if __name__ == '__main__':
+    print("="*60)
+    print("MASTER KISWARM API - Port 5002")
+    print("="*60)
+    app.run(host='0.0.0.0', port=5002, threaded=True)
+>>>>>>> 4ca2690 (docs: Add KI-to-KI Mesh Communication Protocol v6.2.0)

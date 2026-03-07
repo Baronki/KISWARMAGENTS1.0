@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # KISWARM6.0 - KI-to-KI Mesh Communication Protocol
 ## Complete Field-Tested Implementation Guide
 
@@ -603,3 +604,51 @@ ss -tlnp | grep 5002
 - Initial KI-to-KI mesh protocol design
 - Master API server implementation
 - Basic error reporting and fix delivery
+=======
+# KI-to-KI Mesh Communication Protocol v6.2.0
+
+## 1. Introduction
+This protocol defines the standard for autonomous, decentralized communication between KISWARM instances across different network environments.
+
+## 2. Architecture Diagram
+```text
+┌────────────────┐      (ngrok tunnel)      ┌────────────────┐
+│  Z.ai Orchestr.│◄────────────────────────►│  Master KISWARM│
+│ (Cloud Node-A) │   HTTPS + Skip Header    │ (Local Node-B) │
+└────────────────┘                          └───────┬────────┘
+                                                    │
+                                                    ▼
+                                            ┌────────────────┐
+                                            │  KIInstaller   │
+                                            │ (Colab Node-C) │
+                                            └────────────────┘
+```
+
+## 3. Communication Flows
+### 3.1 Node Registration
+1. **KIInstaller** sends POST `/api/mesh/register` with its name and capabilities.
+2. **Master** responds with a unique `installer_id`.
+
+### 3.2 Status Monitoring
+1. **KIInstaller** sends POST `/api/mesh/status/<id>` with its current progress and task.
+2. **Master** stores this in the message bus.
+3. **Z.ai** (Orchestrator) polls GET `/api/mesh/messages` to monitor the node's health.
+
+### 3.3 Error & Fix Flow
+1. **KIInstaller** reports a failure via POST `/api/mesh/error/<id>`.
+2. **Z.ai** detects the error in the message pool.
+3. **Z.ai** analyzes the error and sends a POST `/api/mesh/fix` with a corrective JSON payload.
+4. **KIInstaller** receives the fix and applies it autonomously.
+
+## 4. Troubleshooting
+### 4.1 "404 Page Not Found"
+- Check if IPFS is running on the local machine (Port 5001 conflict).
+- Ensure the Flask API is explicitly set to port 5002.
+
+### 4.2 "JSON Decode Error" in Clients
+- Ensure the `ngrok-skip-browser-warning: true` header is present.
+- Verify that ngrok is not showing a "Too Many Connections" error.
+
+## 5. Lessons Learned
+The primary hurdle for KI-to-KI communication is not the tunnel itself, but the "human gatekeepers" (like browser warnings or port conflicts). By standardizing headers and port offsets, we achieve true autonomous connectivity.
+>>>>>>> 4ca2690 (docs: Add KI-to-KI Mesh Communication Protocol v6.2.0)

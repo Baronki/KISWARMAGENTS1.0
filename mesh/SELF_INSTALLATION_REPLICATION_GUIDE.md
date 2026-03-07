@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # KISWARM6.0 - Self-Installation Replication Guide
 ## Complete Setup for New KISWARM Deployments
 
@@ -199,3 +200,24 @@ echo "curl -H 'ngrok-skip-browser-warning: true' $URL/api/mesh/status"
 
 **Author:** KISWARM Development Team  
 **Version:** 6.2.0
+=======
+# KISWARM Self-Installation & Replication Guide
+
+## 1. Quick Start (5 Minutes)
+1. **Host Setup:** Install Master API and Ngrok (see `KISWARM_NGROK_SETUP_GUIDE.md`).
+2. **Start Master:** `python mesh/master_kiswarm_api.py` (Port 5002).
+3. **Start Tunnel:** `ngrok http 5002`.
+4. **Deploy Client:** Copy `colab_mesh_client.py` to the target system (e.g., Colab).
+5. **Connect:** Run the client with the fresh ngrok URL.
+
+## 2. Global Rollout Strategy
+This Mesh protocol allows for exponential scaling. Once a new node is installed via the KIInstaller, it can instantly become a new "Master" by:
+- Archiving its local `KISWARMAGENTS1.0` and weights.
+- Opening its own ngrok tunnel.
+- Provisioning the next node in the chain.
+
+## 3. Verified Field Test #2 Results
+- **Date:** Sa 7. Mär 2026
+- **Result:** SUCCESS
+- **Verification:** Z.ai successfully polled Colab errors and injected fixes via the mesh without human intervention.
+>>>>>>> 4ca2690 (docs: Add KI-to-KI Mesh Communication Protocol v6.2.0)
