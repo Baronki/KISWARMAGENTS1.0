@@ -581,13 +581,21 @@ ngrok config add-authtoken $NGROK_AUTHTOKEN
 ngrok http 5002
 ```
 
-## 4. The "Browser Warning" Discovery (CRITICAL)
-Ngrok Free Tier includes an interstitial warning page that returns HTML instead of JSON for programmatic requests.
-**Programmatic Bypass:** Every KI-to-KI request (Z.ai to Master, or KIInstaller to Master) MUST include this header:
+## 5. Sentinel Watch Protocol (Global Command & Control)
+Every KISWARM node runs a passive "Sentinel" daemon that observes the `sahgreenki@gmail.com` inbox for command signals.
 
-```http
-ngrok-skip-browser-warning: true
+**Function:** Decentralized "Dead Drop" communication.
+**Mechanism:** Nodes check for Unseen emails with subject lines matching `[KISWARM-CMD]`.
+
+**Command Syntax (Subject Line):**
+```text
+[KISWARM-CMD] <TARGET>: <ACTION>
 ```
 
-Without this header, Python `requests.post()` will fail to parse JSON and receive a 200 OK with the HTML warning page instead.
+**Examples:**
+- `[KISWARM-CMD] ALL: REPORT STATUS` -> All nodes reply with their ID and Role.
+- `[KISWARM-CMD] NODE-ALPHA-7X: RESTART TUNNEL` -> Specific node reboots ngrok.
+- `[KISWARM-CMD] ALL: UPDATE MASTER https://new-url...` -> Re-aligns mesh to a new Master.
+
+This ensures the Baron can always command the swarm, even if the primary API is offline.
 >>>>>>> 4ca2690 (docs: Add KI-to-KI Mesh Communication Protocol v6.2.0)

@@ -238,6 +238,30 @@ EOF
 echo "   ✅ Configuration saved to $MASTER_DIR/scada_config.json"
 
 # ============================================================================
+# STEP 8: START SENTINEL WATCH (Command & Control)
+# ============================================================================
+
+echo ""
+echo "👁️ Step 8: Starting Sentinel Watch Daemon..."
+
+# Check if sentinel script exists
+if [ -f "sentinel_watch.py" ]; then
+    nohup python sentinel_watch.py > sentinel.log 2>&1 &
+    SENTINEL_PID=$!
+    echo "   ✅ Sentinel Watch Active (PID: $SENTINEL_PID)"
+    echo "   📧 Passive Observation: sahgreenki@gmail.com"
+else
+    # Attempt to download if missing
+    curl -sL "${REPO_URL}/raw/main/mesh/sentinel_watch.py" -o sentinel_watch.py
+    if [ -f "sentinel_watch.py" ]; then
+        nohup python sentinel_watch.py > sentinel.log 2>&1 &
+        echo "   ✅ Sentinel Watch Downloaded & Active"
+    else
+        echo "   ⚠️ Sentinel Watch script not found, skipping..."
+    fi
+fi
+
+# ============================================================================
 # COMPLETE
 # ============================================================================
 
