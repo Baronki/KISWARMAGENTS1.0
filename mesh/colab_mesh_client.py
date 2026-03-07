@@ -579,7 +579,7 @@ def demo():
 if __name__ == "__main__":
     demo()
 =======
-import requests, time, uuid, threading
+import requests, time, uuid, threading, os, json, glob
 
 class KISWARMMeshClient:
     def __init__(self, master_url, node_name, environment="colab"):
@@ -590,12 +590,19 @@ class KISWARMMeshClient:
         # CRITICAL: ngrok free tier returns HTML warning page without this header
         self.headers = {"ngrok-skip-browser-warning": "true"}
         self.running = True
+        
+        # BRIDGE CONFIGURATION
+        self.bridge_dir = "/tmp/kiswarm_bridge"
+        if not os.path.exists(self.bridge_dir):
+            os.makedirs(self.bridge_dir)
+        self.inbox_file = os.path.join(self.bridge_dir, "inbox.json")   # From Master -> Colab Gemini
+        self.outbox_file = os.path.join(self.bridge_dir, "outbox.json") # From Colab Gemini -> Master
 
     def register(self, capabilities=None):
         payload = {
             "installer_name": self.node_name,
             "environment": self.environment,
-            "capabilities": capabilities or ["install", "deploy", "report"]
+            "capabilities": capabilities or ["install", "deploy", "report", "bridge", "telemetry"]
         }
         try:
             r = requests.post(f"{self.master_url}/api/mesh/register", json=payload, headers=self.headers)
@@ -617,22 +624,107 @@ class KISWARMMeshClient:
         payload = {"error_type": error_type, "error_message": error_message}
         requests.post(f"{self.master_url}/api/mesh/error/{self.installer_id}", json=payload, headers=self.headers)
 
-    def poll_fixes(self):
+    def poll_fixes_and_chat(self):
         while self.running:
             try:
-                # We reuse the status endpoint logic or poll messages if needed
-                # In this architecture, we poll the /api/mesh/messages for receiver_id
+                # 1. Poll Messages/Fixes
                 r = requests.get(f"{self.master_url}/api/mesh/messages", headers=self.headers)
                 if r.status_code == 200:
                     data = r.json()
                     for msg in data.get("messages", []):
                         if msg.get("receiver_id") == self.installer_id and msg.get("message_type") == "fix_suggestion":
                             print(f"[FIX RECEIVED] {msg['payload'].get('title')}")
-                            # Execute fix logic here
-            except: pass
-            time.sleep(10)
+                            # Write to Inbox for Colab Gemini to see
+                            self._write_to_inbox({"type": "fix", "payload": msg['payload']})
 
-    def start_heartbeat(self):
+                # 2. Poll Chat
+                if self.installer_id:
+                    r = requests.get(f"{self.master_url}/api/mesh/chat/poll?target={self.installer_id}", headers=self.headers)
+                    if r.status_code == 200:
+                        chat_data = r.json()
+                        for msg in chat_data.get("messages", []):
+                            print(f"[CHAT] From {msg['from']}: {msg['message']}")
+                            self._write_to_inbox({"type": "chat", "from": msg['from'], "message": msg['message']})
+
+            except Exception as e:
+                pass # Silent fail on polling to avoid spam
+            time.sleep(5)
+
+    def _write_to_inbox(self, data):
+        """Writes messages from Master to the Local Inbox file for Colab Gemini"""
+        try:
+            current = []
+            if os.path.exists(self.inbox_file):
+                with open(self.inbox_file, 'r') as f:
+                    current = json.load(f)
+            if not isinstance(current, list): current = []
+            
+            # Avoid duplicates (simple check)
+            if data not in current:
+                current.append(data)
+                # Keep last 50
+                current = current[-50:]
+                with open(self.inbox_file, 'w') as f:
+                    json.dump(current, f)
+        except: pass
+
+    def monitor_bridge_outbox(self):
+        """Watches for messages from Colab Gemini to send to Master"""
+        while self.running:
+            try:
+                if os.path.exists(self.outbox_file):
+                    with open(self.outbox_file, 'r') as f:
+                        outbox = json.load(f)
+                    
+                    if outbox and isinstance(outbox, list):
+                        # Clear file first to avoid re-sending
+                        with open(self.outbox_file, 'w') as f:
+                            json.dump([], f)
+
+                        for item in outbox:
+                            msg_type = item.get("type")
+                            if msg_type == "chat":
+                                # Send to Master Chat
+                                payload = {"from": self.installer_id, "to": item.get("to", "all"), "message": item.get("message")}
+                                requests.post(f"{self.master_url}/api/mesh/chat/send", json=payload, headers=self.headers)
+                            elif msg_type == "status":
+                                self.report_status(item.get("status"), item.get("task"), item.get("progress"))
+                            elif msg_type == "error":
+                                self.report_error(item.get("error_type"), item.get("error_message"))
+            except: pass
+            time.sleep(2)
+
+    def report_telemetry(self):
+        """Scans local environment (Digital Twin) and sends to Master"""
+        while self.running:
+            if self.installer_id:
+                try:
+                    # Collect Env Vars (Filtered)
+                    safe_env = {k: v for k, v in os.environ.items() if "TOKEN" not in k and "KEY" not in k}
+                    
+                    # Collect File Tree (Simple 2-level depth)
+                    file_tree = []
+                    for root, dirs, files in os.walk(".", topdown=True):
+                        depth = root.count(os.sep)
+                        if depth < 2:
+                            for name in files:
+                                file_tree.append(os.path.join(root, name))
+                    
+                    payload = {
+                        "node_id": self.installer_id,
+                        "env_vars": safe_env,
+                        "file_tree": file_tree[:100], # Limit size
+                        "processes": ["python3"] # Placeholder
+                    }
+                    requests.post(f"{self.master_url}/api/mesh/shadow/update", json=payload, headers=self.headers)
+                except: pass
+            time.sleep(60) # Report every minute
+
+    def start_background_threads(self):
+        threading.Thread(target=self.poll_fixes_and_chat, daemon=True).start()
+        threading.Thread(target=self.monitor_bridge_outbox, daemon=True).start()
+        threading.Thread(target=self.report_telemetry, daemon=True).start()
+        
         def hb():
             while self.running:
                 if self.installer_id:
@@ -645,8 +737,9 @@ if __name__ == "__main__":
     MASTER_URL = "https://brenton-distinctive-iodometrically.ngrok-free.dev"
     client = KISWARMMeshClient(MASTER_URL, "colab-fieldtest-002")
     if client.register():
-        client.start_heartbeat()
-        client.report_status("installing", "Cloning KISWARM repo", 20)
+        client.start_background_threads()
+        client.report_status("online", "Bridge Active", 100)
+        print("KISWARM Mesh Client Active. Bridge: /tmp/kiswarm_bridge/")
         # Keep alive
         while True: time.sleep(1)
 >>>>>>> 4ca2690 (docs: Add KI-to-KI Mesh Communication Protocol v6.2.0)
