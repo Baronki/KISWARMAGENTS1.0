@@ -156,8 +156,15 @@ PUBLIC_URL=$(curl -s http://127.0.0.1:4040/api/tunnels | python3 -c "import sys,
 if [ -n "$PUBLIC_URL" ]; then
     echo "   ✅ ngrok tunnel established"
     echo "   🔗 Public URL: $PUBLIC_URL"
+    
+    # TRIGGER LIFEBOAT SMTP HEARTBEAT
+    # Sends the current URL to Baron's Gmail Gift Account
+    echo "   📧 Sending Legacy SMTP Heartbeat..."
+    python3 -c "import sys; sys.path.append('.'); from lifeboat_email import report_mesh_online; report_mesh_online('$PUBLIC_URL')" || echo "   ⚠️ SMTP Heartbeat Failed"
 else
     echo "   ⚠️ Could not get public URL, check ngrok dashboard"
+    # Report failure if possible
+    python3 -c "import sys; sys.path.append('.'); from lifeboat_email import report_critical_failure; report_critical_failure('Tunnel Establishment Failed')" || true
 fi
 
 # ============================================================================

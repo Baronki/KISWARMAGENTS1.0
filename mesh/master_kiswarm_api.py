@@ -41,6 +41,18 @@ import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
+# Import Lifeboat Email Utility
+try:
+    # We use a relative path if needed, or assume it's in the same dir
+    sys_path = os.path.dirname(os.path.abspath(__file__))
+    import sys
+    if sys_path not in sys.path:
+        sys.path.append(sys_path)
+    from lifeboat_email import report_mesh_online, report_critical_failure
+except ImportError:
+    def report_mesh_online(url): print(f"SMTP Mock: Mesh Online @ {url}")
+    def report_critical_failure(msg): print(f"SMTP Mock: Critical Failure: {msg}")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
