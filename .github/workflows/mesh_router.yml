@@ -1,0 +1,45 @@
+name: KISWARM Mesh Router
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # Every 5 minutes
+  issues:
+    types: [opened, edited]
+  workflow_dispatch:
+
+jobs:
+  mesh-router:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pages: write
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install Dependencies
+        run: |
+          pip install -q flask flask-cors requests pyngrok
+      
+      - name: Process Mesh Messages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python scripts/mesh_router.py
+      
+      - name: Commit State Changes
+        run: |
+          git config --local user.email "mesh-router@kiswarm.local"
+          git config --local user.name "KISWARM Mesh Router"
+          git add -A
+          git diff --quiet && git diff --staged --quiet || git commit -m "chore: mesh state update [skip ci]"
+          git push
