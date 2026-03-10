@@ -42,7 +42,7 @@ REPO_URL="https://github.com/Baronki/KISWARMAGENTS1.0"
 echo ""
 echo "📦 Step 1: Installing dependencies..."
 
-pip install -q flask flask-cors requests 2>/dev/null || pip3 install -q flask flask-cors requests
+pip install -q flask flask-cors requests google-api-python-client google-auth-httplib2 google-auth-oauthlib 2>/dev/null || pip3 install -q flask flask-cors requests google-api-python-client google-auth-httplib2 google-auth-oauthlib
 
 echo "   ✅ Dependencies installed"
 
