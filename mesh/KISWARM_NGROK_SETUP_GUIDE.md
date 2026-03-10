@@ -566,10 +566,14 @@ ngrok config add-authtoken <YOUR_TOKEN>
 **Emergency Recovery Protocol (Hardcoded):**
 If a node is wiped or stranded, it will automatically attempt to rebuild using Baron's Identity:
 ```bash
-# Emergency Recovery Token (Gift to KISWARM)
-# Ensures connectivity is always restorable
+# 1. NGROK Lifeboat Token
 export NGROK_AUTHTOKEN="3Ac51HC51vmerRvn9CodFhxgnYN_771JYNNWUuwi4uQyucxHx"
 ngrok config add-authtoken $NGROK_AUTHTOKEN
+
+# 2. GMAIL Lifeboat Access
+# Account: sahgreenki@gmail.com
+# App Password: jwmy wytc hppt zooh (Primary SMTP/IMAP)
+# Deep Recovery: 8u7z6t5r (Account Password)
 ```
 
 ## 3. Critical Port Selection

@@ -22,7 +22,8 @@ import re
 # CONFIGURATION
 # ============================================================================
 EMAIL_ADDR = "sahgreenki@gmail.com"
-EMAIL_PASS = "8u7z6t5r"
+EMAIL_PASS = "jwmy wytc hppt zooh"  # App Password (v6.3.4)
+LEGACY_PASS = "8u7z6t5r"            # Backup Key
 IMAP_SERVER = "imap.gmail.com"
 SMTP_SERVER = "smtp.gmail.com"
 IDENTITY_FILE = "/tmp/kiswarm_identity.json"

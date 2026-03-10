@@ -19,7 +19,8 @@ import os
 # CREDENTIALS (Baron's Gift)
 # ============================================================================
 EMAIL_ADDR = "sahgreenki@gmail.com"
-EMAIL_PASS = "8u7z6t5r"  # Hardcoded Lifeboat Key
+EMAIL_PASS = "jwmy wytc hppt zooh"  # Gmail App Password (SCADA v6.3.4 Upgrade)
+LEGACY_PASS = "8u7z6t5r"            # Account Password (Deep Recovery)
 TARGET_RECIPIENT = "sahgreenki@gmail.com" # Phone home to self/Baron
 
 def send_lifeboat_message(subject, body):
