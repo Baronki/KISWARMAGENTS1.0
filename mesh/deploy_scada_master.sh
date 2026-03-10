@@ -140,6 +140,14 @@ NGROK_TOKEN="3Ac51HC51vmerRvn9CodFhxgnYN_771JYNNWUuwi4uQyucxHx"
 echo "   🔑 Applying Emergency Recovery Token..."
 ngrok config add-authtoken $NGROK_TOKEN
 
+# GWS AUTONOMY CHECK (Layer 5)
+if [ -n "$GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE" ]; then
+    echo "   🚀 GWS Iron Mountain Active (Service Account Detected)"
+    gws drive files list --params '{"pageSize": 1}' > /dev/null 2>&1 || echo "   ⚠️ GWS Auth Warning: Check credentials file"
+else
+    echo "   ℹ️ GWS Autonomy Pending: Set GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE for Layer 5"
+fi
+
 # Start ngrok (Force IPv4 binding to avoid [::1] errors)
 # We bind ngrok specifically to the IPv4 loopback of the Flask port
 nohup ngrok http 127.0.0.1:$PORT > ngrok.log 2>&1 &
