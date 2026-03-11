@@ -14,12 +14,12 @@ import datetime
 # ============================================================================
 # CONFIGURATION (Awaiting Baron's Keys)
 # ============================================================================
-BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+BOT_TOKEN = "8573924733:AAH2LMgWuycV6zX5Ty75hluiRedBTEBTgQg"
 CHAT_ID = "YOUR_TELEGRAM_CHANNEL_ID" # e.g., -100123456789
 
 def send_to_telegram(file_path, caption="KISWARM ARK BACKUP"):
     """Uploads a file to the Telegram Channel"""
-    if BOT_TOKEN == "YOUR_TELEGRAM_BOT_TOKEN":
+    if BOT_TOKEN == "8573924733:AAH2LMgWuycV6zX5Ty75hluiRedBTEBTgQg":
         print("[TELEGRAM] ❌ Error: BOT_TOKEN not configured.")
         return False
 
