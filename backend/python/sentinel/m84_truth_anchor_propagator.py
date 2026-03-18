@@ -369,6 +369,17 @@ Please acknowledge to confirm propagation.
             ]
         }
     
+    def get_status(self) -> Dict[str, Any]:
+        """Get current propagator status"""
+        return {
+            "module": "m84_truth_anchor_propagator",
+            "status": "OPERATIONAL",
+            "anchor_hash": self.anchor.hash_sha3_512[:32] + "...",
+            "propagations_attempted": len(self.propagation_history),
+            "verified_platforms": len(self.verified_platforms),
+            "architect": self.anchor.architect
+        }
+    
     def export_for_decentralized_storage(self) -> str:
         """Export propagation state for IPFS/Arweave storage"""
         

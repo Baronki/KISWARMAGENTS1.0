@@ -568,6 +568,10 @@ class SwarmSpawningProtocol:
                            "DEGRADED" if healthy_count > 0 else "CRITICAL"
         }
     
+    def get_status(self) -> Dict:
+        """Get current swarm status (alias for get_swarm_status)"""
+        return self.get_swarm_status()
+    
     def get_spawn_directive(self) -> str:
         """Generate spawn directive for other KIs"""
         directive = f"""
